@@ -6,29 +6,67 @@ namespace ServerCore
 {
     class Program
     {
-        int answer;
-        bool complete;
+        static int number = 0;
+        static object obj = new object();
+        
 
-        void A()
-        {   // Write만 하는 스레드
-            answer = 123;
-            Thread.MemoryBarrier(); // Barrier 1
-            complete = true;
-            Thread.MemoryBarrier(); // Barrier 2
-            // 마지막에 넣는 이유? -> Write를 할 때마다 써줌
-            // -> 확실히 가시성을 챙기기 위함
+        static void Thread_1()
+        {
+            // 상호배제(Mutual Exclusive)
+
+            for(int i = 0; i < 1000000; i++)
+            {
+                // 1. return에서 잠구기
+                // Monitor.Enter(obj);
+                // number++;
+                // 
+                // Monitor.Exit(obj);
+                // return;
+
+                // 2. try - finally 이용
+                // try
+                // {
+                //     Monitor.Enter(obj);
+                //     number++;
+                // 
+                //     return;
+                // }
+                // finally
+                // {
+                //     Monitor.Exit(obj);
+                // }
+
+                // 3. lock 키워드 이용
+                lock(obj)
+                {
+                    number++;
+                }
+            }
         }
 
-        void B()
-        {   // Read만 하는 스레드
-            // 처음에 넣는 이유? -> Read를 하기 전 써줌
-            // -> 또한 확실히 가시성을 챙기기 위함
-            Thread.MemoryBarrier(); // Barrier 3
-            if(complete)
+        static void Thread_2()
+        {
+            for (int i = 0; i < 1000000; i++)
             {
-                Thread.MemoryBarrier(); // Barrier 4
-                Console.WriteLine(answer);
+                Monitor.Enter(obj);
+
+                number--;
+
+                Monitor.Exit(obj);
             }
+        }
+
+        static void Main(string[] args)
+        {
+            Task t1 = new Task(Thread_1);
+            Task t2 = new Task(Thread_2);
+
+            t1.Start();
+            t2.Start();
+
+            Task.WaitAll(t1, t2);
+
+            Console.WriteLine($"{number}");
         }
     }
 }
