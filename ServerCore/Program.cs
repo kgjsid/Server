@@ -10,19 +10,9 @@ namespace ServerCore
         volatile int _locked = 0;
 
         public void Acquire()
-        {   // Monitor Enter의 역할(획득)
-
-            // 레퍼런스로 변수를 하나 넣어주고, 세팅할 값을 넣어줌
-            // 최종적으로 주는 값은 이전에 원본 값을 줌
-            // => 이것이 가지는 의미가 굉장히 중요함.
-            // 만약 이전에 잠근 상태가 있었다면 1을 줄거임. 그것은 한번 더 잠궜다는 의미
-
+        {   
             while (true)
             {
-                // CompareExchange : 일반적인 버전. 
-                // (조작하기 위한 값, 넣어줄 값, 비교할 값)
-                // => 조작하기 위한 값과 비교할 값을 보고, 같다면 넣어줄 값을 넣음
-                // 이런 계열의 함수를 CAS(Compare And Swap) / C++에도 있음
                 int expected = 0;   // 예상되는 값
                 int desired = 1;    // 넣고싶은 값
 
@@ -30,6 +20,11 @@ namespace ServerCore
                 {
                     break;
                 }
+
+                // 휴식 ~ / 쉬다 올게 ~
+                // Thread.Sleep(1);    // 무조건 휴식 => 무조건 1ms 정도 쉬고 싶어요
+                // Thread.Sleep(0);    // 조건부 양보 => 나보다 우선순위가 낮은 애들한테는 양보 불가 => 우선순위가 나보다 같거나 높은 스레드가 없으면 다시 본인한테 
+                Thread.Yield();     // 관대한 양보 => 관대하게 양보할테니, 지금 실행이 가능한 쓰레드가 있으면 실행하세요 => 실행 가능한 애가 없으면 남은 시간 소진
             }
         }
 
