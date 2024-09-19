@@ -4,76 +4,57 @@ using System.Threading.Tasks;
 
 namespace ServerCore
 {
-    class SpinLock
-    {
-        // 잡혀 있는 상태의 표현
-        volatile int _locked = 0;
-
-        public void Acquire()
-        {   
-            while (true)
-            {
-                int expected = 0;   // 예상되는 값
-                int desired = 1;    // 넣고싶은 값
-
-                if(Interlocked.CompareExchange(ref _locked, desired, expected) == expected)
-                {
-                    break;
-                }
-
-                // 휴식 ~ / 쉬다 올게 ~
-                // Thread.Sleep(1);    // 무조건 휴식 => 무조건 1ms 정도 쉬고 싶어요
-                // Thread.Sleep(0);    // 조건부 양보 => 나보다 우선순위가 낮은 애들한테는 양보 불가 => 우선순위가 나보다 같거나 높은 스레드가 없으면 다시 본인한테 
-                Thread.Yield();     // 관대한 양보 => 관대하게 양보할테니, 지금 실행이 가능한 쓰레드가 있으면 실행하세요 => 실행 가능한 애가 없으면 남은 시간 소진
-            }
-        }
-
-        public void Release()
-        {   // Monitor Exit의 역할(내려놓기)
-            _locked = 0;
-        }
-    }
-
     class Program
     {
-        static int number = 0;
-        static SpinLock _lock = new SpinLock();
+        static object _lock1 = new object();
+        static SpinLock _lock2 = new SpinLock();
+        static Mutex _lock3 = new Mutex();
 
-        static void Thread_1()
+        static ReaderWriterLockSlim _lock4 = new ReaderWriterLockSlim();
+
+        class Reward
         {
-            for(int i = 0; i < 100000; i++)
-            {
-                _lock.Acquire();
 
-                number++;
-
-                _lock.Release();
-            }
         }
 
-        static void Thread_2()
-        {
-            for (int i = 0; i < 100000; i++)
-            {
-                _lock.Acquire();
+        static Reward GetRewardById(int id)
+        {   // id로 Reward를 조회하는 함수
+            _lock4.EnterReadLock();
 
-                number--;
+            _lock4.ExitReadLock();
 
-                _lock.Release();
-            }
+            return null;
+        }
+
+        static void AddReward(Reward reward)
+        {   // 보상을 추가할 함수
+            _lock4.EnterWriteLock();
+
+            _lock4.ExitWriteLock();
         }
 
         static void Main(string[] args)
         {
-            Task t1 = new Task(Thread_1);
-            Task t2 = new Task(Thread_2);
+            lock(_lock1)
+            {
 
-            t1.Start();
-            t2.Start();
+            }
 
-            Task.WaitAll(t1, t2);
+            bool lockTaken = false;
+            try
+            {   
+                _lock2.Enter(ref lockTaken); 
+            }
+            finally
+            {
+                if (lockTaken)
+                {
+                    _lock2.Exit();
+                }
+            }
 
-            Console.WriteLine($"{number}");
+            _lock3.WaitOne();
+            _lock3.ReleaseMutex();
         }
     }
 }
