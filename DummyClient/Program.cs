@@ -25,7 +25,7 @@ namespace DummyClient
                 // RemoteEndPoint : 연결된 서버라고 생각
                 Console.WriteLine($"Connected To {socket.RemoteEndPoint.ToString()}");
 
-                // 보낸다
+                // 보낸다 
                 byte[] sendBuff = Encoding.UTF8.GetBytes("Hello World");
                 int sendBytes = socket.Send(sendBuff);
 

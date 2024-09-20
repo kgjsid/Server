@@ -6,6 +6,37 @@ namespace ServerCore
 {
     class Program
     {
+        static Listener listener = new Listener();
+
+        static void OnAcceptHandler(Socket clientSocket)
+        {
+            try
+            {
+                // 받기
+                // -> 클라이언트가 보내는 정보를 받기 위함
+                // recvBuff에 클라이언트가 보내준 데이터가, recvBytes에는 몇 바이트를 받았는지
+                byte[] recvBuff = new byte[1024];
+                int recvBytes = clientSocket.Receive(recvBuff);
+                // 문자로 테스트를 위해 작성
+                string recvData = Encoding.UTF8.GetString(recvBuff, 0, recvBytes);
+                Console.WriteLine($"[From Client] {recvData}");
+
+                // 보내기
+                // -> 클라이언트에게 메시지 전송
+                byte[] sendBuff = Encoding.UTF8.GetBytes("Welcome to MMORPG Server!");
+                clientSocket.Send(sendBuff);
+
+                // 쫓아낸다
+                // -> 예고를 하고 쫓아냄
+                clientSocket.Shutdown(SocketShutdown.Both);
+                clientSocket.Close();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+            }
+        }
+
         static void Main(string[] args)
         {
             // DNS(Domain Name System)
@@ -22,50 +53,8 @@ namespace ServerCore
             // 포트 번호 : 정문, 후문 생각 -> 클라이언트가 엉뚱한 번호로 접근하면 못하도록 막음
             // 클라이언트가 접속할 주소도 똑같이 맞춰줘야 함
 
-            // 리슨 소켓 제작
-            Socket listenSocket = new Socket(endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-
-            try
-            {
-                // bind 작업(문지기 교육)
-                listenSocket.Bind(endPoint);
-
-                // Listen(영업 시작)
-                // backLog : 최대 대기 수
-                listenSocket.Listen(10);
-
-                while (true)
-                {   // 루프를 돌면서 체크
-                    Console.WriteLine("Listening...");
-
-                    // 클라이언트(손님)을 입장 -> Accept
-                    Socket clientSocket = listenSocket.Accept();
-
-                    // 받기
-                    // -> 클라이언트가 보내는 정보를 받기 위함
-                    // recvBuff에 클라이언트가 보내준 데이터가, recvBytes에는 몇 바이트를 받았는지
-                    byte[] recvBuff = new byte[1024];
-                    int recvBytes = clientSocket.Receive(recvBuff);
-                    // 문자로 테스트를 위해 작성
-                    string recvData = Encoding.UTF8.GetString(recvBuff, 0, recvBytes);
-                    Console.WriteLine($"[From Client] {recvData}");
-
-                    // 보내기
-                    // -> 클라이언트에게 메시지 전송
-                    byte[] sendBuff = Encoding.UTF8.GetBytes("Welcome to MMORPG Server!");
-                    clientSocket.Send(sendBuff);
-
-                    // 쫓아낸다
-                    // -> 예고를 하고 쫓아냄
-                    clientSocket.Shutdown(SocketShutdown.Both);
-                    clientSocket.Close();
-                }
-            }
-            catch(Exception e)
-            {
-                Console.WriteLine(e.ToString());
-            }
-
+            listener.Init(endPoint, OnAcceptHandler);
+            Console.WriteLine("Listening...");
         }
     }
 }
