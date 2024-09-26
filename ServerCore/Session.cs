@@ -8,26 +8,27 @@ namespace ServerCore
         Socket clientSocket;
         int _disconnected = 0;
         SocketAsyncEventArgs _sendArgs = new SocketAsyncEventArgs();
+        SocketAsyncEventArgs _recvArgs = new SocketAsyncEventArgs();
+
+        List<ArraySegment<byte>> _pendingList = new List<ArraySegment<byte>>();
 
         object _lock = new object();
-        bool _pending = false;
         Queue<byte[]> _sendQueue = new Queue<byte[]>();
 
         public void Start(Socket clientSocket)
         {
             this.clientSocket = clientSocket;
 
-            SocketAsyncEventArgs recvargs = new SocketAsyncEventArgs();
-            recvargs.Completed += new EventHandler<SocketAsyncEventArgs>(OnRecvCompleted);
+            _recvArgs.Completed += new EventHandler<SocketAsyncEventArgs>(OnRecvCompleted);
 
             // receive의 경우 버퍼를 통하여 데이터를 받아오므로
             // 버퍼 설정이 필요함
             // 추가적인 정보가 필요할 때 recvargs.UserToken = this;
-            recvargs.SetBuffer(new byte[1024], 0, 1024);
+            _recvArgs.SetBuffer(new byte[1024], 0, 1024);
 
             _sendArgs.Completed += new EventHandler<SocketAsyncEventArgs>(OnSendCompleted);
 
-            ResisterRecv(recvargs);
+            ResisterRecv();
         }
 
         public void Send(byte[] sendBuff)
@@ -36,7 +37,7 @@ namespace ServerCore
             {   
                 _sendQueue.Enqueue(sendBuff);
 
-                if (_pending == false)
+                if (_pendingList.Count == 0)
                     ResisterSend();
             }
         }
@@ -55,9 +56,18 @@ namespace ServerCore
 
         void ResisterSend()
         {   // Send 등록
-            _pending = true;    // 현재 하나의 Send 진행 중
-            byte[] buff = _sendQueue.Dequeue();
-            _sendArgs.SetBuffer(buff, 0, buff.Length);
+            // _pending = true;    // 현재 하나의 Send 진행 중
+                                //byte[] buff = _sendQueue.Dequeue();
+                                // _sendArgs.SetBuffer(buff, 0, buff.Length);
+            // 넘길 리스트 목록
+            _pendingList.Clear();
+
+            while (_sendQueue.Count > 0)
+            {   // Send큐에 있는 것들을 전부 측정
+                byte[] buff = _sendQueue.Dequeue();
+                _pendingList.Add(new ArraySegment<byte>(buff, 0, buff.Length));
+            }
+            _sendArgs.BufferList = _pendingList;
 
             bool pending = clientSocket.SendAsync(_sendArgs);
 
@@ -73,6 +83,10 @@ namespace ServerCore
                 {
                     try
                     {   // Send 진행 종료
+                        _sendArgs.BufferList = null;
+                        _pendingList.Clear();
+
+                        Console.WriteLine($"Transferred bytes : {_sendArgs.BytesTransferred}");
 
                         if (_sendQueue.Count > 0)
                         {   // pending 중인 상황에서 누군가 Send를 또 하게되면
@@ -80,10 +94,10 @@ namespace ServerCore
                             // 추가 처리가 필요함
                             ResisterSend();
                         }
-                        else
-                        {   // 그 사이에 아무도 패킷을 추가하지 않음
-                            _pending = false;
-                        }
+                        //else
+                        //{   // 그 사이에 아무도 패킷을 추가하지 않음
+                        //    _pending = false;
+                        //}
                     }
                     catch (Exception e)
                     {
@@ -97,13 +111,13 @@ namespace ServerCore
             }
         }
 
-        void ResisterRecv(SocketAsyncEventArgs args)
+        void ResisterRecv()
         {   // receive 요청
-            bool pending = clientSocket.ReceiveAsync(args);
+            bool pending = clientSocket.ReceiveAsync(_recvArgs);
 
             if(pending == false)
             {
-                OnRecvCompleted(null, args);
+                OnRecvCompleted(null, _recvArgs);
             }
         }
 
@@ -117,7 +131,7 @@ namespace ServerCore
                     Console.WriteLine($"[From Client] {recvData}");
 
                     // 다시 요청으로
-                    ResisterRecv(args);
+                    ResisterRecv();
                 }
                 catch(Exception e)
                 {
